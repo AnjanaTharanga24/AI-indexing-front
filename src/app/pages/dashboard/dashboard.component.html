@@ -1,0 +1,166 @@
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header__icon">
+    <i class="fa-solid fa-gauge-high"></i>
+  </div>
+  <div class="page-header__text">
+    <h1 class="page-header__title">Dashboard</h1>
+    <p class="page-header__subtitle">Overview of AI document processing activity and statistics</p>
+  </div>
+</div>
+
+<!-- Loading -->
+<div *ngIf="loading" class="text-center" style="padding: 60px 0">
+  <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: var(--au-orange)"></i>
+  <p style="margin-top: 12px; color: var(--au-ink-dim); font-size: 14px">Loading dashboard...</p>
+</div>
+
+<!-- Error -->
+<div *ngIf="error && !loading" class="aura-card" style="border-left: 3px solid var(--au-danger)">
+  <div style="padding: 20px; display: flex; align-items: center; gap: 12px; color: var(--au-danger)">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span>{{ error }}</span>
+    <button class="btn btn-sm btn-outline-secondary" style="margin-left: auto" (click)="loadDashboardData()">Retry</button>
+  </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="row mb-4 stat-row" *ngIf="!loading">
+  <div class="col-sm-6 col-lg-3">
+    <div class="aura-stat aura-stat-accent">
+      <div class="aura-stat-icon"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="aura-stat-content">
+        <div class="aura-stat-label">Total Templates</div>
+        <div class="aura-stat-value">{{ totalTemplates }}</div>
+        <div class="aura-stat-meta">
+          <i class="fa-solid fa-database"></i>
+          <span>Available in system</span>
+        </div>
+      </div>
+      <div class="aura-stat-sparkline">
+        <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+          <polyline points="0,25 10,20 20,22 30,15 40,18 50,10 60,12 70,8 80,5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="aura-stat aura-stat-green">
+      <div class="aura-stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="aura-stat-content">
+        <div class="aura-stat-label">Profiled</div>
+        <div class="aura-stat-value">{{ profiledTemplates }}</div>
+        <div class="aura-stat-meta">
+          <i class="fa-solid fa-percent"></i>
+          <span>{{ profilePercentage }}% coverage</span>
+        </div>
+      </div>
+      <div class="aura-stat-sparkline">
+        <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+          <polyline points="0,28 10,22 20,25 30,18 40,20 50,14 60,10 70,8 80,3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="aura-stat aura-stat-amber">
+      <div class="aura-stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <div class="aura-stat-content">
+        <div class="aura-stat-label">Unprofiled</div>
+        <div class="aura-stat-value">{{ unprofiled }}</div>
+        <div class="aura-stat-meta">
+          <i class="fa-solid fa-clock"></i>
+          <span>Needs AI profile</span>
+        </div>
+      </div>
+      <div class="aura-stat-sparkline">
+        <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+          <polyline points="0,10 10,15 20,8 30,12 40,18 50,14 60,20 70,16 80,18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-sm-6 col-lg-3">
+    <div class="aura-stat aura-stat-info">
+      <div class="aura-stat-icon"><i class="fa-solid fa-microchip"></i></div>
+      <div class="aura-stat-content">
+        <div class="aura-stat-label">AI Model</div>
+        <div class="aura-stat-value" style="font-size: 16px">{{ aiModel || '—' }}</div>
+        <div class="aura-stat-meta">
+          <i class="fa-solid fa-robot"></i>
+          <span>Classification engine</span>
+        </div>
+      </div>
+      <div class="aura-stat-sparkline">
+        <svg viewBox="0 0 80 30" preserveAspectRatio="none">
+          <polyline points="0,15 10,12 20,18 30,10 40,14 50,8 60,12 70,6 80,10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Profiles Table -->
+<div class="row" *ngIf="!loading && profiles.length > 0">
+  <div class="col-12">
+    <div class="aura-card">
+      <div class="aura-card-head">
+        <span>AI Profiles</span>
+        <span class="aura-card-head__badge">{{ profiles.length }} profiles</span>
+      </div>
+      <div class="aura-card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover activity-table mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>TEMPLATE NAME</th>
+                <th>MODEL</th>
+                <th>VERSION</th>
+                <th>SUMMARY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of profiles">
+                <td class="doc-id">{{ p.templateId }}</td>
+                <td>
+                  <span class="template-tag">{{ p.templateName }}</span>
+                </td>
+                <td>
+                  <span class="type-badge type-badge--info">{{ p.model }}</span>
+                </td>
+                <td>
+                  <span class="activity-badge activity-badge--success">v{{ p.version }}</span>
+                </td>
+                <td class="summary-cell">{{ p.summary }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Empty State -->
+<div class="row" *ngIf="!loading && profiles.length === 0 && !error">
+  <div class="col-12">
+    <div class="aura-card">
+      <div style="text-align: center; padding: 60px 20px">
+        <div style="font-size: 40px; color: var(--au-ink-faint); margin-bottom: 16px">
+          <i class="fa-solid fa-file-circle-question"></i>
+        </div>
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--au-ink); margin: 0 0 8px">No Profiles Yet</h3>
+        <p style="font-size: 14px; color: var(--au-ink-dim); margin: 0 0 20px">
+          Create AI profiles to start classifying documents automatically.
+        </p>
+        <a routerLink="/profile-generator" class="btn btn-sm" style="background: var(--au-orange); color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; font-size: 13px; text-decoration: none">
+          <i class="fa-solid fa-plus"></i> Create Profile
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

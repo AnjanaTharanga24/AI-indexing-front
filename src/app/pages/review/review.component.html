@@ -1,0 +1,239 @@
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header__icon">
+    <i class="fa-solid fa-clipboard-check"></i>
+  </div>
+  <div class="page-header__text">
+    <h1 class="page-header__title">Review Queue</h1>
+    <p class="page-header__subtitle">Review low-confidence and failed classifications, then send to pending folder</p>
+  </div>
+  <div class="page-header__right" *ngIf="files.length > 0">
+    <div class="header-stat">
+      <div class="header-stat__icon header-stat__icon--pending">
+        <i class="fa-solid fa-clock"></i>
+      </div>
+      <div class="header-stat__info">
+        <span class="header-stat__value">{{ pendingCount }}</span>
+        <span class="header-stat__label">Pending</span>
+      </div>
+    </div>
+    <div class="header-stat">
+      <div class="header-stat__icon header-stat__icon--done">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div class="header-stat__info">
+        <span class="header-stat__value">{{ doneCount }}</span>
+        <span class="header-stat__label">Completed</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Empty state -->
+<div class="rv-empty-card" *ngIf="files.length === 0">
+  <div class="rv-empty">
+    <div class="rv-empty__visual">
+      <div class="rv-empty__circle">
+        <i class="fa-solid fa-clipboard-check"></i>
+      </div>
+      <div class="rv-empty__ring"></div>
+    </div>
+    <h3 class="rv-empty__title">No Documents to Review</h3>
+    <p class="rv-empty__text">Documents with confidence below 70% or that failed classification will appear here for manual review.</p>
+    <div class="rv-empty__steps">
+      <div class="rv-empty__step">
+        <div class="rv-empty__step-num">1</div>
+        <span>Upload & classify documents in <strong>Auto Index</strong></span>
+      </div>
+      <div class="rv-empty__step">
+        <div class="rv-empty__step-num">2</div>
+        <span>Low-confidence & failed results are sent here</span>
+      </div>
+      <div class="rv-empty__step">
+        <div class="rv-empty__step-num">3</div>
+        <span>Review the document & send to pending</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Review Layout -->
+<div class="rv-layout" *ngIf="files.length > 0">
+
+  <!-- Left: Document List -->
+  <div class="rv-list">
+    <div class="rv-list__header">
+      <h6><i class="fa-solid fa-layer-group"></i> Documents</h6>
+      <span class="rv-list__badge">{{ pendingCount }} pending</span>
+    </div>
+    <div class="rv-list__items">
+      <div class="rv-file" *ngFor="let f of files; let i = index"
+           [class.is-selected]="selectedIndex === i"
+           [class.is-done]="f.status === 'done'"
+           [class.is-processing]="f.status === 'processing'"
+           (click)="selectFile(i)">
+        <div class="rv-file__icon">
+          <i class="fa-solid" [ngClass]="getFileIcon(f.name)"></i>
+        </div>
+        <div class="rv-file__info">
+          <span class="rv-file__name">{{ f.name }}</span>
+          <div class="rv-file__meta">
+            <span>{{ f.size }}</span>
+            <span class="rv-file__conf" *ngIf="f.confidence"
+                  [ngClass]="'conf-' + getConfidenceClass(f.confidence)">
+              {{ getConfidencePercent(f.confidence) }}%
+            </span>
+          </div>
+        </div>
+        <div class="rv-file__status">
+          <i class="fa-solid fa-circle-check" *ngIf="f.status === 'done'" style="color: var(--au-success)"></i>
+          <i class="fa-solid fa-spinner fa-spin" *ngIf="f.status === 'processing'" style="color: var(--au-orange)"></i>
+          <i class="fa-solid fa-exclamation-circle" *ngIf="f.status === 'pending'" style="color: var(--au-warning)"></i>
+        </div>
+      </div>
+    </div>
+    <div class="rv-list__footer">
+      <span><i class="fa-solid fa-check" style="color: var(--au-success)"></i> {{ doneCount }} done</span>
+      <span><i class="fa-solid fa-clock" style="color: var(--au-warning)"></i> {{ pendingCount }} pending</span>
+    </div>
+  </div>
+
+  <!-- Center: Document Preview -->
+  <div class="rv-preview">
+    <div class="rv-preview__toolbar" *ngIf="current">
+      <div class="rv-preview__file-info">
+        <i class="fa-solid" [ngClass]="getFileIcon(current.name)"></i>
+        <span class="rv-preview__name">{{ current.name }}</span>
+      </div>
+      <span class="rv-preview__size">{{ current.size }}</span>
+    </div>
+    <div class="rv-preview__area" *ngIf="current && previewUrl">
+      <img *ngIf="isImage(current.name)" [src]="previewUrl" alt="Document" class="rv-preview__img" />
+      <iframe *ngIf="!isImage(current.name)" [src]="previewUrl" class="rv-preview__pdf"></iframe>
+    </div>
+    <div class="rv-preview__empty" *ngIf="!current">
+      <div class="rv-preview__empty-icon">
+        <i class="fa-solid fa-file-circle-question"></i>
+      </div>
+      <span>Select a document to preview</span>
+    </div>
+  </div>
+
+  <!-- Right: Review Panel -->
+  <div class="rv-panel" *ngIf="current">
+    <!-- AI Classification Result -->
+    <div class="rv-section">
+      <h6 class="rv-section__title"><i class="fa-solid fa-robot"></i> AI Classification</h6>
+      <div class="rv-ai-card" *ngIf="current.selectedTemplateName">
+        <div class="rv-ai-card__row">
+          <span class="rv-ai-card__label">Matched Profile</span>
+          <span class="rv-ai-card__value">{{ current.selectedTemplateName }}</span>
+        </div>
+        <div class="rv-ai-card__row">
+          <span class="rv-ai-card__label">Confidence</span>
+          <div class="rv-ai-card__conf-wrap">
+            <div class="rv-ai-card__conf-bar">
+              <div class="rv-ai-card__conf-fill"
+                   [ngClass]="'fill-' + getConfidenceClass(current.confidence)"
+                   [style.width.%]="getConfidencePercent(current.confidence)"></div>
+            </div>
+            <span class="rv-ai-card__conf-pct" [ngClass]="'conf-' + getConfidenceClass(current.confidence)">
+              {{ getConfidencePercent(current.confidence) }}%
+            </span>
+          </div>
+        </div>
+        <div class="rv-ai-card__row" *ngIf="current.classifyResult?.reason">
+          <span class="rv-ai-card__label">Reason</span>
+          <span class="rv-ai-card__reason">{{ current.classifyResult.reason }}</span>
+        </div>
+        <div class="rv-ai-card__warning" *ngIf="getConfidencePercent(current.confidence) < 70">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>Below 70% threshold — manual review required</span>
+        </div>
+      </div>
+      <div class="rv-ai-no-match" *ngIf="!current.selectedTemplateName && !current.classifyError">
+        <i class="fa-solid fa-circle-question"></i>
+        <div>
+          <strong>No match found</strong>
+          <p>AI could not identify this document type.</p>
+        </div>
+      </div>
+      <div class="rv-ai-failed" *ngIf="current.classifyError">
+        <i class="fa-solid fa-circle-xmark"></i>
+        <div>
+          <strong>Classification Failed</strong>
+          <p>{{ current.classifyError }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Candidate Matches -->
+    <div class="rv-section" *ngIf="current.classifyResult?.candidates?.length > 0">
+      <h6 class="rv-section__title"><i class="fa-solid fa-ranking-star"></i> Profile Matches</h6>
+      <div class="rv-candidates">
+        <div class="rv-candidate" *ngFor="let c of current.classifyResult.candidates; let i = index"
+             [class.is-top]="i === 0"
+             [class.is-selected]="c.templateId === current.selectedTemplateId">
+          <div class="rv-candidate__rank">{{ i + 1 }}</div>
+          <div class="rv-candidate__info">
+            <span class="rv-candidate__name">{{ c.templateName }}</span>
+            <div class="rv-candidate__bar-wrap">
+              <div class="rv-candidate__bar">
+                <div class="rv-candidate__bar-fill"
+                     [ngClass]="'fill-' + getConfidenceClass(c.confidence)"
+                     [style.width.%]="getConfidencePercent(c.confidence)"></div>
+              </div>
+              <span class="rv-candidate__pct" [ngClass]="'conf-' + getConfidenceClass(c.confidence)">
+                {{ getConfidencePercent(c.confidence) }}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Processing indicator -->
+    <div class="rv-section" *ngIf="current.status === 'processing'">
+      <div class="rv-status-card rv-status-card--processing">
+        <div class="rv-status-card__spinner">
+          <svg viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke="rgba(79,95,232,0.15)" />
+            <circle cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke="var(--au-orange)"
+                    stroke-dasharray="30 70" stroke-linecap="round" transform="rotate(-90 18 18)">
+              <animateTransform attributeName="transform" type="rotate"
+                                values="-90 18 18;270 18 18" dur="1s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+        </div>
+        <div>
+          <strong>Sending to pending...</strong>
+          <p>Uploading document to V4 pending folder</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done indicator -->
+    <div class="rv-section" *ngIf="current.status === 'done'">
+      <div class="rv-status-card rv-status-card--done">
+        <div class="rv-status-card__check">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <div>
+          <strong>Sent to Pending</strong>
+          <p>Document uploaded to V4 pending folder</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action -->
+    <div class="rv-action">
+      <button class="rv-btn-confirm" (click)="confirmAndProcess()"
+              [disabled]="current.status !== 'pending'">
+        <i class="fa-solid fa-paper-plane"></i> Send to Pending
+      </button>
+      <p class="rv-action__hint" *ngIf="current.status === 'pending'">
+        Review the document and send it to the V4 pending folder
+      </p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,269 @@
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header__icon">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+  </div>
+  <div class="page-header__text">
+    <h1 class="page-header__title">Profile Generator</h1>
+    <p class="page-header__subtitle">Upload a sample document and let AI generate a reusable profile</p>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Input Form -->
+  <div class="col-md-5">
+    <div class="au-card">
+      <div class="au-card-body">
+
+        <!-- Template Selection -->
+        <div class="section-header">
+          <div class="section-header__left">
+            <div class="section-header__icon">
+              <i class="fa-solid fa-clipboard-list"></i>
+            </div>
+            <div>
+              <div class="section-header__title">Select Profile <span style="color: var(--au-danger)">*</span></div>
+              <div class="section-header__subtitle">Choose which profile type to generate</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pg-select-wrap">
+          <i class="fa-solid fa-layer-group pg-select-icon"></i>
+          <select class="pg-select" [(ngModel)]="selectedTemplateId" [disabled]="loadingTemplates">
+            <option [ngValue]="null" disabled>
+              {{ loadingTemplates ? 'Loading profiles...' : '-- Select a Profile --' }}
+            </option>
+            <option *ngFor="let t of templates" [ngValue]="t.id">{{ t.name }}</option>
+          </select>
+        </div>
+        <span class="pg-hint" *ngIf="!loadingTemplates">{{ templates.length }} profiles available</span>
+
+        <!-- File Upload -->
+        <div class="section-header" style="margin-top: 24px">
+          <div class="section-header__left">
+            <div class="section-header__icon section-header__icon--upload">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div>
+              <div class="section-header__title">Document Files <span style="color: var(--au-danger)">*</span></div>
+              <div class="section-header__subtitle">Upload a sample document to analyze</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dropzone"
+             [class.is-dragging]="dragOver"
+             [class.has-files]="files.length > 0"
+             (dragover)="onDragOver($event)"
+             (dragleave)="onDragLeave($event)"
+             (drop)="onDrop($event)">
+          <i class="fa-solid fa-cloud-arrow-up dropzone__icon"></i>
+          <p class="dropzone__text">Drag & drop files here</p>
+          <p class="dropzone__hint">PNG, JPG, PDF — single or multiple</p>
+          <button type="button" class="browse-btn" (click)="browseFiles(); $event.stopPropagation()">
+            <i class="fa-solid fa-folder-open"></i> Browse Files
+          </button>
+        </div>
+
+        <!-- File List -->
+        <div class="file-list" *ngIf="files.length > 0">
+          <div class="file-row" *ngFor="let f of files; let i = index">
+            <div class="file-row__icon" [ngClass]="f.name.endsWith('.pdf') ? 'icon-pdf' : 'icon-img'">
+              <i class="fa-solid" [ngClass]="getFileIcon(f.name)"></i>
+            </div>
+            <div class="file-row__info">
+              <span class="file-row__name">{{ f.name }}</span>
+              <span class="file-row__size">{{ f.size }}</span>
+            </div>
+            <button class="file-row__remove" (click)="removeFile(i); $event.stopPropagation()" *ngIf="!loading">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div class="pg-alert" *ngIf="error">
+          <i class="fa-solid fa-circle-exclamation"></i>{{ error }}
+        </div>
+
+        <!-- Buttons -->
+        <div class="action-row">
+          <button class="btn-start" (click)="submit()" [disabled]="loading">
+            <span *ngIf="!loading">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Profile
+            </span>
+            <span *ngIf="loading">
+              <i class="fa-solid fa-spinner fa-spin"></i> Analyzing...
+            </span>
+          </button>
+          <button class="btn-reset" (click)="reset()" [disabled]="loading">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="col-md-7">
+    <!-- Generated Profile Results -->
+    <div *ngFor="let r of results; let i = index">
+      <div class="au-card" *ngIf="r.status === 'done' && r.data" style="margin-bottom: 16px">
+        <div class="au-card-head" (click)="toggleExpand(i)" style="cursor: pointer">
+          <h6><i class="fa-solid fa-sparkles"></i> {{ r.fileName }}</h6>
+          <div class="pg-chips">
+            <span class="pg-chip pg-chip--accent" *ngIf="r.data.templateName">{{ r.data.templateName }}</span>
+            <span class="pg-chip pg-chip--neutral" *ngIf="r.data.templateId">ID: {{ r.data.templateId }}</span>
+            <span class="pg-chip pg-chip--info" *ngIf="r.data.model">{{ r.data.model }}</span>
+            <span class="pg-chip pg-chip--success" *ngIf="r.data.version">v{{ r.data.version }}</span>
+          </div>
+        </div>
+        <div class="au-card-body" *ngIf="expandedIndex === i || results.length === 1">
+          <!-- Summary -->
+          <div class="pg-section" *ngIf="r.data.summary">
+            <div class="pg-section__label label--summary">
+              <i class="fa-solid fa-file-lines"></i> Summary
+            </div>
+            <p class="pg-section__text">{{ r.data.summary }}</p>
+          </div>
+
+          <!-- Identifying Features -->
+          <div class="pg-section" *ngIf="r.data.identifyingFeatures?.length">
+            <div class="pg-section__label label--features">
+              <i class="fa-solid fa-fingerprint"></i> Identifying Features
+            </div>
+            <ul class="pg-feature-list">
+              <li *ngFor="let f of r.data.identifyingFeatures">
+                <i class="fa-solid fa-check"></i><span>{{ f }}</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Alternative Names -->
+          <div class="pg-section" *ngIf="r.data.alternativeNames?.length">
+            <div class="pg-section__label label--alt">
+              <i class="fa-solid fa-tags"></i> Alternative Names
+            </div>
+            <div class="pg-alt-names">
+              <span class="pg-alt-chip" *ngFor="let n of r.data.alternativeNames">{{ n }}</span>
+            </div>
+          </div>
+
+          <!-- Distinguishing Features -->
+          <div class="pg-section" *ngIf="r.data.distinguishingFeatures?.length">
+            <div class="pg-section__label label--distinguish">
+              <i class="fa-solid fa-star"></i> Distinguishing Features
+            </div>
+            <ul class="pg-feature-list pg-feature-list--distinguish">
+              <li *ngFor="let d of r.data.distinguishingFeatures">
+                <i class="fa-solid fa-diamond"></i><span>{{ d }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Result -->
+      <div class="au-card" *ngIf="r.status === 'error'" style="margin-bottom: 16px; border-left: 3px solid var(--au-danger)">
+        <div style="padding: 16px 20px; display: flex; align-items: center; gap: 12px">
+          <i class="fa-solid fa-circle-xmark" style="color: var(--au-danger); font-size: 18px"></i>
+          <div>
+            <div style="font-weight: 600; color: var(--au-ink); font-size: 13px">{{ r.fileName }}</div>
+            <div style="font-size: 12px; color: var(--au-danger); margin-top: 2px">{{ r.error }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="au-card" *ngIf="loading">
+      <div class="pg-loading-state">
+        <div class="pg-loading-state__spinner">
+          <svg viewBox="0 0 36 36" class="pg-loading-ring">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke="var(--au-sand)" />
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke="var(--au-orange)"
+                    stroke-dasharray="40 60" stroke-linecap="round" transform="rotate(-90 18 18)">
+              <animateTransform attributeName="transform" type="rotate" from="0 18 18" to="360 18 18" dur="1.2s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+          <i class="fa-solid fa-wand-magic-sparkles pg-loading-state__icon"></i>
+        </div>
+        <h3 class="pg-loading-state__title">AI is analyzing your document</h3>
+        <p class="pg-loading-state__text">Extracting features, identifying patterns, and building the profile...</p>
+        <div class="pg-loading-state__steps">
+          <span class="pg-loading-step is-done"><i class="fa-solid fa-check"></i> Uploaded</span>
+          <span class="pg-loading-step is-active"><i class="fa-solid fa-spinner fa-spin"></i> Analyzing</span>
+          <span class="pg-loading-step"><i class="fa-solid fa-clock"></i> Generating</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="au-card" *ngIf="results.length === 0 && !loading">
+      <div class="pg-empty-state">
+        <div class="pg-empty-state__illustration">
+          <div class="pg-illust">
+            <i class="fa-solid fa-file-lines pg-illust__doc pg-illust__doc--back"></i>
+            <i class="fa-solid fa-wand-magic-sparkles pg-illust__wand"></i>
+            <i class="fa-solid fa-file-circle-check pg-illust__doc pg-illust__doc--front"></i>
+          </div>
+        </div>
+        <h3 class="pg-empty-state__title">Generate a Document Profile</h3>
+        <p class="pg-empty-state__text">Select a profile type and upload a sample document. The AI will analyze it and create a reusable identification profile.</p>
+
+        <div class="pg-feature-cards">
+          <div class="pg-feature-card">
+            <div class="pg-feature-card__icon pg-feature-card__icon--analyze">
+              <i class="fa-solid fa-magnifying-glass-chart"></i>
+            </div>
+            <span class="pg-feature-card__label">Analyze</span>
+            <span class="pg-feature-card__desc">AI reads document structure</span>
+          </div>
+          <div class="pg-feature-card">
+            <div class="pg-feature-card__icon pg-feature-card__icon--extract">
+              <i class="fa-solid fa-fingerprint"></i>
+            </div>
+            <span class="pg-feature-card__label">Identify</span>
+            <span class="pg-feature-card__desc">Extract key features</span>
+          </div>
+          <div class="pg-feature-card">
+            <div class="pg-feature-card__icon pg-feature-card__icon--profile">
+              <i class="fa-solid fa-id-card"></i>
+            </div>
+            <span class="pg-feature-card__label">Profile</span>
+            <span class="pg-feature-card__desc">Build reusable template</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Modal -->
+<div class="summary-overlay" *ngIf="showSummary" (click)="closeSummary()">
+  <div class="summary-modal" (click)="$event.stopPropagation()">
+    <div class="summary-modal__header">
+      <div class="summary-modal__icon">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h3>Generation Complete</h3>
+      <p>{{ summaryData?.total }} file{{ summaryData?.total !== 1 ? 's' : '' }} processed in {{ summaryData?.timeTaken }}</p>
+    </div>
+    <div class="summary-modal__body">
+      <div class="summary-stat">
+        <span class="summary-stat__label">Successful</span>
+        <span class="summary-stat__value" style="color: var(--au-success)">{{ summaryData?.success }}</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat__label">Failed</span>
+        <span class="summary-stat__value" style="color: var(--au-danger)">{{ summaryData?.failed }}</span>
+      </div>
+    </div>
+    <div class="summary-modal__footer">
+      <button class="btn-start" style="width: 100%" (click)="closeSummary()">
+        <i class="fa-solid fa-check"></i> Done
+      </button>
+    </div>
+  </div>
+</div>

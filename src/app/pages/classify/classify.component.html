@@ -1,0 +1,597 @@
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header__icon">
+    <i class="fa-solid fa-bolt"></i>
+  </div>
+  <div class="page-header__text">
+    <h1 class="page-header__title">Auto Index</h1>
+    <p class="page-header__subtitle">Automatically identify document type and extract key information</p>
+  </div>
+</div>
+
+<!-- Mode switcher -->
+<div class="mode-switcher" style="margin-bottom: 20px">
+  <button class="mode-switcher__btn" [class.is-active]="mode === 'auto'" (click)="mode = 'auto'; onModeChange()">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>Auto Classify
+  </button>
+  <button class="mode-switcher__btn" [class.is-active]="mode === 'manual'" (click)="mode = 'manual'; onModeChange()">
+    <i class="fa-solid fa-hand-pointer"></i>Select Profile
+  </button>
+</div>
+
+<div class="row">
+  <!-- Left: Upload & Config -->
+  <div class="col-md-6">
+    <div class="au-card">
+      <div class="au-card-body">
+
+        <!-- ===== Manual Mode: Multi-Select Profile Grid ===== -->
+        <div *ngIf="mode === 'manual'" style="margin-bottom: 20px">
+          <div class="section-header">
+            <div class="section-header__left">
+              <div class="section-header__icon">
+                <i class="fa-solid fa-clipboard-list"></i>
+              </div>
+              <div>
+                <div class="section-header__title">Select Profiles <span style="color: var(--au-danger)">*</span></div>
+                <div class="section-header__subtitle">Choose one or more document profiles for extraction</div>
+              </div>
+            </div>
+            <span class="section-header__badge">{{ profiles.length }} Profiles Available</span>
+          </div>
+
+          <!-- Search -->
+          <div class="profile-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" placeholder="Search profiles..."
+                   [(ngModel)]="templateSearchText" [disabled]="extracting">
+          </div>
+
+          <!-- Selected chips -->
+          <div class="tpl-chips" *ngIf="selectedTemplateIds.length > 0" style="margin-bottom: 12px">
+            <span class="tpl-chip" *ngFor="let id of selectedTemplateIds">
+              {{ getTemplateName(id) }}
+              <i class="fa-solid fa-xmark tpl-chip__remove" (click)="removeTemplate(id)"></i>
+            </span>
+            <button class="tpl-chip-clear" (click)="clearTemplateSelection()">Clear all</button>
+          </div>
+
+          <!-- Profile Card Grid (multi-select) -->
+          <div class="profile-grid">
+            <div class="profile-card"
+                 *ngFor="let p of filteredProfiles"
+                 [class.is-selected]="isTemplateSelected(p.templateId)"
+                 (click)="toggleTemplate(p.templateId)">
+              <span class="profile-card__check">
+                <i class="fa-solid fa-check" *ngIf="isTemplateSelected(p.templateId)"></i>
+              </span>
+              <div class="profile-card__icon" [ngClass]="'picon-' + getProfileIcon(p.templateName)">
+                <i class="fa-solid" [ngClass]="'fa-' + getProfileIcon(p.templateName)"></i>
+              </div>
+              <span class="profile-card__name">{{ p.templateName }}</span>
+            </div>
+            <div class="profile-card profile-card--empty" *ngIf="filteredProfiles.length === 0">
+              <i class="fa-solid fa-inbox" style="font-size: 20px; color: var(--au-ink-faint); margin-bottom: 4px"></i>
+              <span style="font-size: 12px; color: var(--au-ink-faint)">No profiles found</span>
+            </div>
+          </div>
+
+          <!-- Select All link -->
+          <div class="profile-grid-footer">
+            <span class="profile-grid-footer__count">{{ selectedTemplateIds.length }} selected</span>
+            <button class="tpl-select-all-btn" (click)="selectAllTemplates()"
+                    *ngIf="selectedTemplateIds.length < profiles.length">Select All</button>
+          </div>
+        </div>
+
+        <!-- ===== Document Files Section ===== -->
+        <div class="section-header" style="margin-top: 8px">
+          <div class="section-header__left">
+            <div class="section-header__icon section-header__icon--upload">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <div>
+              <div class="section-header__title">Document Files</div>
+              <div class="section-header__subtitle">Upload one or more documents to analyze</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drop Zone -->
+        <div class="dropzone"
+             [class.is-dragging]="dragOver"
+             [class.has-files]="files.length > 0"
+             (dragover)="onDragOver($event)"
+             (dragleave)="onDragLeave($event)"
+             (drop)="onDrop($event)">
+          <i class="fa-solid fa-cloud-arrow-up dropzone__icon"></i>
+          <p class="dropzone__text">Drag & drop files here</p>
+          <p class="dropzone__hint">PNG, JPG, PDF — single or multiple</p>
+          <button type="button" class="browse-btn" (click)="browseFiles(); $event.stopPropagation()">
+            <i class="fa-solid fa-folder-open"></i> Browse Files
+          </button>
+        </div>
+
+        <!-- File List -->
+        <div class="file-list" *ngIf="files.length > 0">
+          <div class="file-row" *ngFor="let f of files; let i = index"
+               [class.is-active]="currentFileIndex === i">
+            <div class="file-row__icon" [ngClass]="f.name.endsWith('.pdf') ? 'icon-pdf' : 'icon-img'">
+              <i class="fa-solid" [ngClass]="getFileIcon(f.name)"></i>
+            </div>
+            <div class="file-row__info">
+              <span class="file-row__name">{{ f.name }}</span>
+              <span class="file-row__size">{{ f.size }}</span>
+            </div>
+            <span class="file-row__status" *ngIf="f.pipelineStatus !== 'waiting'"
+                  [ngClass]="{
+                    'st-success': f.pipelineStatus === 'done',
+                    'st-warning': f.pipelineStatus === 'needs_review',
+                    'st-danger': f.pipelineStatus === 'error',
+                    'st-processing': f.pipelineStatus === 'classifying' || f.pipelineStatus === 'extracting' || f.pipelineStatus === 'saving'
+                  }">
+              <i class="fa-solid fa-spinner fa-spin"
+                 *ngIf="f.pipelineStatus === 'classifying' || f.pipelineStatus === 'extracting' || f.pipelineStatus === 'saving'"></i>
+              <i class="fa-solid fa-circle-check" *ngIf="f.pipelineStatus === 'done'"></i>
+              <i class="fa-solid fa-triangle-exclamation" *ngIf="f.pipelineStatus === 'needs_review'"></i>
+              <i class="fa-solid fa-circle-xmark" *ngIf="f.pipelineStatus === 'error'"></i>
+              {{ getStatusLabel(f) }}
+            </span>
+            <button class="file-row__remove" (click)="removeFile(i); $event.stopPropagation()"
+                    *ngIf="f.pipelineStatus === 'waiting' && !processing">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div class="classify-alert alert-danger" *ngIf="error">
+          <i class="fa-solid fa-circle-exclamation"></i>{{ error }}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-row">
+          <!-- Auto: Start -->
+          <button *ngIf="mode === 'auto'" class="btn-start" (click)="startPipeline()" [disabled]="!canStart()">
+            <span *ngIf="!processing">
+              <i class="fa-solid fa-play"></i> Start
+            </span>
+            <span *ngIf="processing">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              {{ processedCount }}/{{ files.length }} — {{ currentStep }}
+            </span>
+          </button>
+          <!-- Manual: Start -->
+          <button *ngIf="mode === 'manual'" class="btn-start" (click)="extractManual()" [disabled]="!canExtractManual()">
+            <span *ngIf="!processing">
+              <i class="fa-solid fa-play"></i> Start
+            </span>
+            <span *ngIf="processing">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              {{ processedCount }}/{{ files.length }} — {{ currentStep }}
+            </span>
+          </button>
+          <button class="btn-reset" (click)="clearAll()" [disabled]="processing || extracting">
+            <i class="fa-solid fa-rotate-left"></i> Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Live Processing / Results / Empty State -->
+  <div class="col-md-6">
+
+    <!-- Processing Card -->
+    <div class="au-card process-card" *ngIf="processing">
+      <!-- Header with progress ring -->
+      <div class="proc-header">
+        <div class="proc-header__left">
+          <div class="proc-ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke="var(--au-sand)" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke="var(--au-orange)"
+                      stroke-dasharray="100" [attr.stroke-dashoffset]="100 - getOverallProgress()"
+                      stroke-linecap="round" transform="rotate(-90 18 18)" />
+            </svg>
+            <span class="proc-ring__pct">{{ getOverallProgress() }}%</span>
+          </div>
+          <div class="proc-header__info">
+            <span class="proc-header__title">Processing Documents</span>
+            <span class="proc-header__sub">{{ processedCount }}/{{ files.length }} completed</span>
+          </div>
+        </div>
+        <span class="proc-header__remaining">{{ files.length - processedCount }} remaining</span>
+      </div>
+
+      <!-- Per-document pipeline list -->
+      <div class="pipeline-list">
+        <div class="pipeline-item" *ngFor="let f of files; let i = index; let last = last"
+             [class.is-active]="currentFileIndex === i"
+             [class.is-done]="f.pipelineStatus === 'done'"
+             [class.is-error]="f.pipelineStatus === 'error'"
+             [class.is-waiting]="f.pipelineStatus === 'waiting'"
+             [class.is-review]="f.pipelineStatus === 'needs_review'">
+
+          <!-- Left: timeline node + connector -->
+          <div class="pl-timeline">
+            <div class="pl-node"
+                 [class.node-done]="f.pipelineStatus === 'done'"
+                 [class.node-error]="f.pipelineStatus === 'error'"
+                 [class.node-review]="f.pipelineStatus === 'needs_review'"
+                 [class.node-active]="f.pipelineStatus !== 'done' && f.pipelineStatus !== 'error' && f.pipelineStatus !== 'waiting' && f.pipelineStatus !== 'needs_review'"
+                 [class.node-waiting]="f.pipelineStatus === 'waiting'">
+              <i class="fa-solid fa-check" *ngIf="f.pipelineStatus === 'done'"></i>
+              <i class="fa-solid fa-xmark" *ngIf="f.pipelineStatus === 'error'"></i>
+              <i class="fa-solid fa-triangle-exclamation" *ngIf="f.pipelineStatus === 'needs_review'"></i>
+              <i class="fa-solid fa-circle-notch fa-spin" *ngIf="f.pipelineStatus !== 'done' && f.pipelineStatus !== 'error' && f.pipelineStatus !== 'waiting' && f.pipelineStatus !== 'needs_review'" style="font-size: 11px"></i>
+              <span *ngIf="f.pipelineStatus === 'waiting'" class="pl-node__num">{{ i + 1 }}</span>
+            </div>
+            <div class="pl-connector" *ngIf="!last"
+                 [class.conn-done]="f.pipelineStatus === 'done'"></div>
+          </div>
+
+          <!-- Right: file card -->
+          <div class="pl-card">
+            <div class="pl-card__head">
+              <i class="fa-solid" [ngClass]="f.name.toLowerCase().endsWith('.pdf') ? 'fa-file-pdf' : 'fa-file-image'" class="pl-card__icon"></i>
+              <span class="pl-card__name">{{ f.name }}</span>
+              <span class="pl-card__size">{{ f.size }}</span>
+            </div>
+
+            <!-- Step progress bar (only for active or done files) -->
+            <div class="step-track" *ngIf="f.pipelineStatus !== 'waiting'">
+              <div class="step-node"
+                   [class.s-active]="f.classifyStatus === 'processing'"
+                   [class.s-done]="f.classifyStatus === 'done' && f.pipelineStatus !== 'needs_review'"
+                   [class.s-review]="f.classifyStatus === 'done' && f.pipelineStatus === 'needs_review'"
+                   [class.s-error]="f.classifyStatus === 'error'">
+                <div class="step-dot">
+                  <i class="fa-solid fa-spinner fa-spin" *ngIf="f.classifyStatus === 'processing'"></i>
+                  <i class="fa-solid fa-check" *ngIf="f.classifyStatus === 'done' && f.pipelineStatus !== 'needs_review'"></i>
+                  <i class="fa-solid fa-triangle-exclamation" *ngIf="f.classifyStatus === 'done' && f.pipelineStatus === 'needs_review'"></i>
+                  <i class="fa-solid fa-xmark" *ngIf="f.classifyStatus === 'error'"></i>
+                </div>
+                <span class="step-label">{{ f.pipelineStatus === 'needs_review' ? 'Needs Review' : 'Classify' }}</span>
+              </div>
+              <div class="step-line" [class.line-done]="f.classifyStatus === 'done' && f.pipelineStatus !== 'needs_review'" [class.line-review]="f.classifyStatus === 'done' && f.pipelineStatus === 'needs_review'"></div>
+              <div class="step-node"
+                   [class.s-active]="f.extractStatus === 'processing'"
+                   [class.s-done]="f.extractStatus === 'done'"
+                   [class.s-error]="f.extractStatus === 'error'">
+                <div class="step-dot">
+                  <i class="fa-solid fa-spinner fa-spin" *ngIf="f.extractStatus === 'processing'"></i>
+                  <i class="fa-solid fa-check" *ngIf="f.extractStatus === 'done'"></i>
+                  <i class="fa-solid fa-xmark" *ngIf="f.extractStatus === 'error'"></i>
+                </div>
+                <span class="step-label">Extract</span>
+              </div>
+              <div class="step-line" [class.line-done]="f.extractStatus === 'done'"></div>
+              <div class="step-node"
+                   [class.s-active]="f.saveStatus === 'processing'"
+                   [class.s-done]="f.saveStatus === 'done'"
+                   [class.s-error]="f.saveStatus === 'error'">
+                <div class="step-dot">
+                  <i class="fa-solid fa-spinner fa-spin" *ngIf="f.saveStatus === 'processing'"></i>
+                  <i class="fa-solid fa-check" *ngIf="f.saveStatus === 'done'"></i>
+                  <i class="fa-solid fa-xmark" *ngIf="f.saveStatus === 'error'"></i>
+                </div>
+                <span class="step-label">Index</span>
+              </div>
+            </div>
+
+            <!-- Waiting state label -->
+            <div class="pl-waiting-label" *ngIf="f.pipelineStatus === 'waiting'">
+              <i class="fa-solid fa-clock"></i> Queued
+            </div>
+
+            <!-- Classification result -->
+            <div class="pl-result" *ngIf="f.classifyStatus === 'done' && f.selectedTemplateName && f.pipelineStatus !== 'needs_review'">
+              <span class="pl-result__tag">
+                <i class="fa-solid fa-tag"></i> {{ f.selectedTemplateName }}
+              </span>
+              <span class="pl-result__conf" [ngClass]="'conf-' + getConfidenceClass(f.confidence)">
+                {{ getConfidencePercent(f.confidence) }}%
+              </span>
+              <button class="btn-view" (click)="openDetailModal(i)" title="View details" *ngIf="f.extractStatus === 'done'">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Empty State (no files) -->
+    <div class="au-card" *ngIf="!processing && files.length === 0">
+      <div class="empty-state-v2">
+        <div class="empty-state-v2__illustration">
+          <div class="empty-illust">
+            <i class="fa-solid fa-file-lines empty-illust__doc empty-illust__doc--back"></i>
+            <i class="fa-solid fa-file-lines empty-illust__doc empty-illust__doc--mid"></i>
+            <i class="fa-solid fa-file-circle-check empty-illust__doc empty-illust__doc--front"></i>
+          </div>
+        </div>
+        <h3 class="empty-state-v2__title">Upload documents to get started</h3>
+        <p class="empty-state-v2__subtitle">Add your files and click Start to automatically classify and extract information.</p>
+
+        <div class="feature-cards">
+          <div class="feature-card">
+            <div class="feature-card__icon feature-card__icon--classify">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <span class="feature-card__label">Auto Classify</span>
+            <span class="feature-card__desc">AI identifies document type</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card__icon feature-card__icon--extract">
+              <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <span class="feature-card__label">Extract Data</span>
+            <span class="feature-card__desc">Pull key fields automatically</span>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card__icon feature-card__icon--accurate">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <span class="feature-card__label">Quick &amp; Accurate</span>
+            <span class="feature-card__desc">Fast and reliable results</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Idle state (files added but not started) -->
+    <div class="au-card" *ngIf="!processing && !extracting && files.length > 0 && getGridFiles().length === 0 && extractedCount === 0">
+      <div class="empty-state-v2">
+        <div class="empty-state-v2__illustration">
+          <div class="empty-illust">
+            <i class="fa-solid fa-play empty-illust__play"></i>
+          </div>
+        </div>
+        <h3 class="empty-state-v2__title">{{ files.length }} file{{ files.length > 1 ? 's' : '' }} ready</h3>
+        <p class="empty-state-v2__subtitle">Press Start to begin {{ mode === 'auto' ? 'automatic classification, extraction and saving' : 'extraction and saving' }}</p>
+      </div>
+    </div>
+
+    <!-- Completed state (processing done, results exist) -->
+    <div class="au-card" *ngIf="!processing && !extracting && getGridFiles().length > 0">
+      <div class="au-card-body">
+        <div class="completed-state">
+          <div class="completed-state__icon">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <p class="completed-state__title">Processing Complete</p>
+          <p class="completed-state__text">{{ getGridFiles().length }} file{{ getGridFiles().length > 1 ? 's' : '' }} processed</p>
+          <div class="completed-stats">
+            <span class="stat-chip stat-chip-success" *ngIf="summary?.success">
+              <i class="fa-solid fa-check"></i> {{ summary!.success }} saved
+            </span>
+            <span class="stat-chip stat-chip-warning" *ngIf="summary?.needsReview">
+              <i class="fa-solid fa-triangle-exclamation"></i> {{ summary!.needsReview }} review
+            </span>
+            <span class="stat-chip stat-chip-danger" *ngIf="summary?.failed">
+              <i class="fa-solid fa-xmark"></i> {{ summary!.failed }} failed
+            </span>
+          </div>
+          <button class="btn-open-review" *ngIf="getReviewableFiles().length > 0" (click)="goToReview()">
+            <i class="fa-solid fa-clipboard-check"></i> Review {{ getReviewableFiles().length }} Document{{ getReviewableFiles().length > 1 ? 's' : '' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom: Results Grid -->
+<div class="row" style="margin-top: 24px" *ngIf="getGridFiles().length > 0">
+  <div class="col-12">
+    <div class="au-card">
+      <div class="au-card-head">
+        <h6><i class="fa-solid fa-table-cells-large"></i>Results</h6>
+        <div style="display: flex; gap: 6px">
+          <span class="stat-chip stat-chip-success" *ngIf="summary?.success">{{ summary!.success }} saved</span>
+          <span class="stat-chip stat-chip-warning" *ngIf="summary?.needsReview">{{ summary!.needsReview }} review</span>
+          <span class="stat-chip stat-chip-danger" *ngIf="summary?.failed">{{ summary!.failed }} failed</span>
+        </div>
+      </div>
+      <div style="padding: 0; overflow-x: auto">
+        <table class="table table-hover results-table mb-0">
+          <thead>
+            <tr>
+              <th style="width: 40px">#</th>
+              <th>File Name</th>
+              <th>Profile</th>
+              <th style="width: 120px">Confidence</th>
+              <th style="width: 130px">Status</th>
+              <th style="width: 70px">Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of getGridFiles(); let i = index"
+                [class.row-success]="f.pipelineStatus === 'done'"
+                [class.row-warning]="f.pipelineStatus === 'needs_review'"
+                [class.row-danger]="f.pipelineStatus === 'error'">
+              <td style="color: var(--au-ink-faint)">{{ i + 1 }}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <i class="fa-solid" [ngClass]="getFileIcon(f.name)" style="color: var(--au-orange); font-size: 12px"></i>
+                  <span class="grid-filename">{{ f.name }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="tpl-badge" *ngIf="f.selectedTemplateName && f.pipelineStatus !== 'needs_review'">{{ f.selectedTemplateName }}</span>
+                <span style="color: var(--au-ink-faint); font-style: italic; font-size: 12px" *ngIf="!f.selectedTemplateName || f.pipelineStatus === 'needs_review'">No match</span>
+              </td>
+              <td>
+                <div class="confidence-mini" *ngIf="f.confidence > 0 && f.pipelineStatus !== 'needs_review'">
+                  <div class="confidence-mini__bar">
+                    <div class="confidence-mini__fill" [ngClass]="'fill-' + getConfidenceClass(f.confidence)"
+                         [style.width.%]="getConfidencePercent(f.confidence)"></div>
+                  </div>
+                  <span class="confidence-mini__pct">{{ getConfidencePercent(f.confidence) }}%</span>
+                </div>
+                <span style="color: var(--au-ink-faint); font-size: 12px" *ngIf="f.confidence === 0 || f.pipelineStatus === 'needs_review'">—</span>
+              </td>
+              <td>
+                <span class="grid-status-badge" [ngClass]="{
+                  'st-success': f.pipelineStatus === 'done',
+                  'st-warning': f.pipelineStatus === 'needs_review',
+                  'st-danger': f.pipelineStatus === 'error'
+                }">
+                  <i class="fa-solid fa-circle-check" *ngIf="f.pipelineStatus === 'done'"></i>
+                  <i class="fa-solid fa-triangle-exclamation" *ngIf="f.pipelineStatus === 'needs_review'"></i>
+                  <i class="fa-solid fa-circle-xmark" *ngIf="f.pipelineStatus === 'error'"></i>
+                  {{ getStatusLabel(f) }}
+                </span>
+              </td>
+              <td style="text-align: center">
+                <button class="btn-view" (click)="openDetailModal(i)">
+                  <i class="fa-solid fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="summary-overlay" *ngIf="showDetailModal && detailModalFile" (click)="closeDetailModal()">
+  <div class="detail-modal" (click)="$event.stopPropagation()">
+    <div class="detail-modal__header">
+      <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0">
+        <i class="fa-solid" [ngClass]="getFileIcon(detailModalFile.name)" style="font-size: 18px; color: var(--au-orange)"></i>
+        <span class="detail-modal__title">{{ detailModalFile.name }}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span class="tpl-badge" *ngIf="detailModalFile.selectedTemplateName">{{ detailModalFile.selectedTemplateName }}</span>
+        <span class="pl-result__conf" *ngIf="detailModalFile.confidence > 0" [ngClass]="'conf-' + getConfidenceClass(detailModalFile.confidence)">
+          {{ getConfidencePercent(detailModalFile.confidence) }}%
+        </span>
+        <button class="btn-close-detail" (click)="closeDetailModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="detail-modal__body">
+      <!-- Classification reason -->
+      <div class="reason-text" *ngIf="detailModalFile.classifyResult?.reason && detailModalFile.classifyResult?.status !== 'NO_MATCH'" style="margin-bottom: 12px">
+        <i class="fa-solid fa-comment-dots"></i>
+        <span>{{ detailModalFile.classifyResult.reason }}</span>
+      </div>
+
+      <!-- Error details -->
+      <div style="font-size: 12px; color: var(--au-danger); margin-bottom: 6px" *ngIf="detailModalFile.classifyError">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right: 4px"></i>Classify: {{ detailModalFile.classifyError }}
+      </div>
+      <div style="font-size: 12px; color: var(--au-danger); margin-bottom: 6px" *ngIf="detailModalFile.extractError">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right: 4px"></i>Extract: {{ detailModalFile.extractError }}
+      </div>
+      <div style="font-size: 12px; color: var(--au-danger); margin-bottom: 6px" *ngIf="detailModalFile.saveError">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right: 4px"></i>Save: {{ detailModalFile.saveError }}
+      </div>
+
+      <!-- Extracted fields -->
+      <div *ngIf="detailModalFile.extractStatus === 'done' && detailModalFile.extractResult">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px">
+          <span style="font-size: 13px; font-weight: 600; color: var(--au-ink)">Extracted Fields</span>
+          <span class="stat-chip stat-chip-neutral" style="font-size: 10px">
+            {{ getExtractedFieldKeys(detailModalFile.extractResult).length }} fields
+          </span>
+        </div>
+        <div class="extract-table">
+          <div class="extract-row extract-header">
+            <div class="extract-cell cell-key">Field</div>
+            <div class="extract-cell cell-val">Value</div>
+          </div>
+          <div class="extract-row" *ngFor="let key of getExtractedFieldKeys(detailModalFile.extractResult)">
+            <div class="extract-cell cell-key">
+              <i class="fa-solid fa-diamond"></i> {{ key }}
+            </div>
+            <div class="extract-cell cell-val">
+              <span *ngIf="detailModalFile.extractResult.extractedFields[key]">{{ detailModalFile.extractResult.extractedFields[key] }}</span>
+              <span style="color: var(--au-ink-faint); font-style: italic" *ngIf="!detailModalFile.extractResult.extractedFields[key]">Not found</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Needs review: warning + manual retry -->
+      <div class="review-box" *ngIf="detailModalFile.pipelineStatus === 'needs_review'" style="margin-top: 12px">
+        <div class="review-box__warning">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span *ngIf="detailModalFile.confidence > 0 && detailModalFile.selectedTemplateName">
+            Low confidence ({{ getConfidencePercent(detailModalFile.confidence) }}%) — auto-indexing skipped.
+          </span>
+          <span *ngIf="detailModalFile.confidence === 0 || !detailModalFile.selectedTemplateName">
+            No profile match found.
+          </span>
+        </div>
+        <div class="review-box__action">
+          <label class="review-box__label">Select profile to continue:</label>
+          <div class="review-box__row">
+            <select class="review-select" [(ngModel)]="detailModalFile.selectedTemplateId"
+                    (ngModelChange)="onReviewProfileChange(detailModalFile, $event)">
+              <option [ngValue]="null" disabled>-- Select Profile --</option>
+              <option *ngFor="let t of profiles" [ngValue]="t.templateId">{{ t.templateName }}</option>
+            </select>
+            <button class="btn-retry" (click)="retryWithProfile(detailModalFile)" [disabled]="!detailModalFile.selectedTemplateId || detailModalFile.pipelineStatus !== 'needs_review'">
+              <i class="fa-solid fa-rotate-right"></i> Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Summary Modal -->
+<div class="summary-overlay" *ngIf="showSummary" (click)="closeSummary()">
+  <div class="summary-modal" (click)="$event.stopPropagation()">
+    <div class="summary-header">
+      <div class="summary-header__icon">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <h5 class="summary-header__title">Processing Complete</h5>
+      <span class="summary-header__sub">All files have been processed</span>
+    </div>
+    <div class="summary-body" *ngIf="summary">
+      <div class="summary-stats">
+        <div class="summary-stat">
+          <span class="summary-stat__value">{{ summary.total }}</span>
+          <span class="summary-stat__label">Total Files</span>
+        </div>
+        <div class="summary-stat is-success">
+          <span class="summary-stat__value">{{ summary.success }}</span>
+          <span class="summary-stat__label">Saved to V4</span>
+        </div>
+        <div class="summary-stat is-warning" *ngIf="summary.needsReview > 0">
+          <span class="summary-stat__value">{{ summary.needsReview }}</span>
+          <span class="summary-stat__label">Needs Review</span>
+        </div>
+        <div class="summary-stat is-danger" *ngIf="summary.failed > 0">
+          <span class="summary-stat__value">{{ summary.failed }}</span>
+          <span class="summary-stat__label">Failed</span>
+        </div>
+      </div>
+      <div class="summary-time">
+        <i class="fa-solid fa-clock" style="margin-right: 4px"></i>Completed in {{ summary.timeTaken }}
+      </div>
+    </div>
+    <div class="summary-footer">
+      <button class="btn-start" style="min-width: auto" (click)="closeSummary()">
+        <i class="fa-solid fa-check"></i> Done
+      </button>
+      <button class="btn-reset" (click)="closeSummary(); clearAll()">
+        <i class="fa-solid fa-rotate-left"></i> Start New Batch
+      </button>
+    </div>
+  </div>
+</div>
+

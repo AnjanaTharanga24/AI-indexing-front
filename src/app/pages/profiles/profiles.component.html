@@ -1,0 +1,232 @@
+<!-- Page Header -->
+<div class="page-header">
+  <div class="page-header__icon">
+    <i class="fa-solid fa-layer-group"></i>
+  </div>
+  <div class="page-header__text">
+    <h1 class="page-header__title">Document Profiles</h1>
+    <p class="page-header__subtitle">Manage document types, key fields, and identification rules</p>
+  </div>
+  <a routerLink="/profile-generator" class="btn-add-profile">
+    <i class="fa-solid fa-plus"></i> Add Profile
+  </a>
+</div>
+
+<!-- Search & View Toggle -->
+<div class="toolbar">
+  <div class="toolbar__search">
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <input type="text" placeholder="Search profiles (e.g., Invoice, PO, Receipt...)"
+           [(ngModel)]="searchText">
+  </div>
+  <div class="toolbar__view-toggle">
+    <button class="view-btn" [class.is-active]="viewMode === 'grid'" (click)="viewMode = 'grid'"
+            title="Grid view">
+      <i class="fa-solid fa-grip"></i>
+    </button>
+    <button class="view-btn" [class.is-active]="viewMode === 'list'" (click)="viewMode = 'list'"
+            title="List view">
+      <i class="fa-solid fa-list"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Loading -->
+<div class="text-center py-5" *ngIf="loading">
+  <div class="spinner-border mb-3" style="color: var(--au-orange)" role="status"></div>
+  <p class="section-text">Loading profiles...</p>
+</div>
+
+<!-- Error -->
+<div class="alert alert-danger" *ngIf="error && !loading">
+  <i class="fa-solid fa-circle-exclamation me-1"></i>{{ error }}
+  <button class="btn btn-sm btn-outline-danger ms-2" (click)="loadProfiles()">Retry</button>
+</div>
+
+<!-- Empty State -->
+<div class="card" *ngIf="!loading && !error && profiles.length === 0">
+  <div class="card-body text-center py-5">
+    <i class="fa-solid fa-folder-open fa-3x mb-3" style="color: var(--au-ink-faint)"></i>
+    <p class="section-text mb-2">No profiles generated yet</p>
+    <a routerLink="/profile-generator" class="btn btn-primary btn-sm">
+      <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate First Profile
+    </a>
+  </div>
+</div>
+
+<!-- ===== GRID VIEW ===== -->
+<div class="profile-grid" *ngIf="!loading && filteredProfiles.length > 0 && viewMode === 'grid'">
+  <div class="profile-card" *ngFor="let p of filteredProfiles"
+       [style.--card-accent]="getCardAccent(p.templateName)">
+    <!-- Card Header -->
+    <div class="profile-card__header">
+      <div class="profile-card__title">
+        <div class="profile-card__title-icon" [ngClass]="'picon-' + getProfileIcon(p.templateName)">
+          <i class="fa-solid" [ngClass]="'fa-' + getProfileIcon(p.templateName)"></i>
+        </div>
+        <span>{{ p.templateName || 'Unnamed Profile' }}</span>
+      </div>
+      <span class="profile-card__id"># ID: {{ p.templateId }}</span>
+    </div>
+
+    <!-- Card Body: Two columns -->
+    <div class="profile-card__body">
+      <!-- Left: Content -->
+      <div class="profile-card__content">
+        <!-- Summary -->
+        <div class="profile-section" *ngIf="p.summary">
+          <div class="profile-section__label label--summary">
+            <i class="fa-solid fa-file-lines"></i> Summary
+          </div>
+          <p class="profile-section__text">{{ p.summary }}</p>
+        </div>
+
+        <!-- Identifying Features -->
+        <div class="profile-section" *ngIf="getFeatures(p).length > 0">
+          <div class="profile-section__label label--features">
+            <i class="fa-solid fa-fingerprint"></i> Identifying Features
+          </div>
+          <ul class="feature-list">
+            <li *ngFor="let f of getFeatures(p)">
+              <i class="fa-solid fa-check"></i>
+              <span>{{ f }}</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+      <!-- Right: Document Illustration -->
+      <div class="profile-card__illustration">
+        <div class="doc-illust" [ngClass]="'doc-illust--' + getProfileIcon(p.templateName)">
+          <div class="doc-illust__page">
+            <div class="doc-illust__lines">
+              <div class="doc-illust__line doc-illust__line--short"></div>
+              <div class="doc-illust__line"></div>
+              <div class="doc-illust__line"></div>
+              <div class="doc-illust__line doc-illust__line--med"></div>
+            </div>
+            <div class="doc-illust__label">{{ p.templateName | uppercase }}</div>
+            <div class="doc-illust__icon-wrap" [ngClass]="'picon-' + getProfileIcon(p.templateName)">
+              <i class="fa-solid" [ngClass]="'fa-' + getProfileIcon(p.templateName)"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alternative Names + Distinguishing Features — full width bottom row -->
+    <div class="bottom-row" *ngIf="getAlternativeNames(p).length > 0 || getDistinguishingFeatures(p).length > 0">
+      <div class="profile-section bottom-row__col" *ngIf="getAlternativeNames(p).length > 0">
+        <div class="profile-section__label label--alt">
+          <i class="fa-solid fa-tags"></i> Alternative Names
+        </div>
+        <div class="alt-names">
+          <span class="alt-chip" *ngFor="let n of getAlternativeNames(p)">{{ n }}</span>
+        </div>
+      </div>
+
+      <div class="profile-section bottom-row__col" *ngIf="getDistinguishingFeatures(p).length > 0">
+        <div class="profile-section__label label--distinguish">
+          <i class="fa-solid fa-star"></i> Distinguishing Features
+        </div>
+        <ul class="feature-list feature-list--distinguish">
+          <li *ngFor="let d of getDistinguishingFeatures(p)">
+            <i class="fa-solid fa-diamond"></i>
+            <span>{{ d }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LIST VIEW ===== -->
+<div class="profile-list" *ngIf="!loading && filteredProfiles.length > 0 && viewMode === 'list'">
+  <!-- List Header -->
+  <div class="list-header">
+    <span class="list-col list-col--name">Profile Name</span>
+    <span class="list-col list-col--summary">Summary</span>
+    <span class="list-col list-col--features">Identifying Features</span>
+    <span class="list-col list-col--alt">Alternative Names</span>
+    <span class="list-col list-col--id">ID</span>
+  </div>
+
+  <!-- List Rows -->
+  <div class="list-row" *ngFor="let p of filteredProfiles"
+       [style.--card-accent]="getCardAccent(p.templateName)"
+       (click)="toggleExpand(p.templateId)">
+    <div class="list-col list-col--name">
+      <div class="profile-card__title-icon" [ngClass]="'picon-' + getProfileIcon(p.templateName)">
+        <i class="fa-solid" [ngClass]="'fa-' + getProfileIcon(p.templateName)"></i>
+      </div>
+      <span>{{ p.templateName || 'Unnamed Profile' }}</span>
+    </div>
+    <span class="list-col list-col--summary">{{ p.summary || '—' }}</span>
+    <span class="list-col list-col--features">
+      <span *ngFor="let f of getFeatures(p); let last = last">{{ f }}{{ last ? '' : ', ' }}</span>
+      <span *ngIf="getFeatures(p).length === 0">—</span>
+    </span>
+    <span class="list-col list-col--alt">
+      <span class="alt-chip" *ngFor="let n of getAlternativeNames(p)">{{ n }}</span>
+      <span *ngIf="getAlternativeNames(p).length === 0">—</span>
+    </span>
+    <span class="list-col list-col--id">
+      <span class="profile-card__id"># {{ p.templateId }}</span>
+    </span>
+  </div>
+
+  <!-- Expanded Detail -->
+  <div class="list-detail" *ngFor="let p of filteredProfiles"
+       [style.--card-accent]="getCardAccent(p.templateName)">
+    <div *ngIf="expandedId === p.templateId" class="list-detail__inner">
+      <div class="list-detail__sections">
+        <div class="profile-section" *ngIf="p.summary">
+          <div class="profile-section__label">
+            <i class="fa-solid fa-file-lines"></i> Summary
+          </div>
+          <p class="profile-section__text" style="-webkit-line-clamp: unset">{{ p.summary }}</p>
+        </div>
+
+        <div class="profile-section" *ngIf="getFeatures(p).length > 0">
+          <div class="profile-section__label">
+            <i class="fa-solid fa-fingerprint"></i> Identifying Features
+          </div>
+          <ul class="feature-list">
+            <li *ngFor="let f of getFeatures(p)">
+              <i class="fa-solid fa-check"></i><span>{{ f }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="profile-section" *ngIf="getDistinguishingFeatures(p).length > 0">
+          <div class="profile-section__label">
+            <i class="fa-solid fa-star"></i> Distinguishing Features
+          </div>
+          <ul class="feature-list feature-list--distinguish">
+            <li *ngFor="let d of getDistinguishingFeatures(p)">
+              <i class="fa-solid fa-diamond"></i><span>{{ d }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="list-detail__illust">
+        <div class="doc-illust" [ngClass]="'doc-illust--' + getProfileIcon(p.templateName)">
+          <div class="doc-illust__page">
+            <div class="doc-illust__lines">
+              <div class="doc-illust__line doc-illust__line--short"></div>
+              <div class="doc-illust__line"></div>
+              <div class="doc-illust__line"></div>
+              <div class="doc-illust__line doc-illust__line--med"></div>
+            </div>
+            <div class="doc-illust__label">{{ p.templateName | uppercase }}</div>
+            <div class="doc-illust__icon-wrap" [ngClass]="'picon-' + getProfileIcon(p.templateName)">
+              <i class="fa-solid" [ngClass]="'fa-' + getProfileIcon(p.templateName)"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

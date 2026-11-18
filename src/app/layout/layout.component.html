@@ -1,0 +1,151 @@
+<!-- Sidebar -->
+<nav class="au-sidebar" [class.is-collapsed]="sidebarCollapsed" [class.is-open]="mobileOpen">
+  <a class="au-brand" routerLink="/dashboard" (click)="closeMobile()">
+    <img class="au-brand__img"
+         [src]="sidebarCollapsed ? 'assets/images/auradocs_logo_only.png' : 'assets/images/auradocs-logo-v4.png'"
+         alt="Auradocs" />
+  </a>
+
+  <div class="au-nav">
+    <div class="au-nav__heading">Main</div>
+    <a class="au-nav__item" routerLink="/dashboard" routerLinkActive="is-active"
+       [routerLinkActiveOptions]="{ exact: true }" (click)="closeMobile()">
+      <i class="fa-solid fa-gauge-high"></i>
+      <span class="au-nav__label">Dashboard</span>
+    </a>
+    <a class="au-nav__item" routerLink="/profile-generator" routerLinkActive="is-active" (click)="closeMobile()">
+      <i class="fa-solid fa-file-circle-check"></i>
+      <span class="au-nav__label">Profile Generator</span>
+    </a>
+    <a class="au-nav__item" routerLink="/profiles" routerLinkActive="is-active" (click)="closeMobile()">
+      <i class="fa-solid fa-id-card"></i>
+      <span class="au-nav__label">Profiles</span>
+    </a>
+    <a class="au-nav__item" routerLink="/classify" routerLinkActive="is-active" (click)="closeMobile()">
+      <i class="fa-solid fa-magnifying-glass-chart"></i>
+      <span class="au-nav__label">Auto Index</span>
+    </a>
+    <a class="au-nav__item" routerLink="/review" routerLinkActive="is-active" (click)="closeMobile()">
+      <i class="fa-solid fa-clipboard-check"></i>
+      <span class="au-nav__label">Review</span>
+    </a>
+
+    <div class="au-nav__heading">Support</div>
+    <a class="au-nav__item" href="javascript:void(0)">
+      <i class="fa-solid fa-map"></i>
+      <span class="au-nav__label">Tour</span>
+    </a>
+    <a class="au-nav__item" href="javascript:void(0)">
+      <i class="fa-solid fa-book"></i>
+      <span class="au-nav__label">User Guide</span>
+    </a>
+  </div>
+
+  <button type="button" class="au-collapse" (click)="toggleSidebar()">
+    <i class="fa fa-angles-left"></i>
+    <span class="au-nav__label">Collapse</span>
+  </button>
+</nav>
+
+<!-- Header -->
+<header class="au-header" [class.is-collapsed]="sidebarCollapsed">
+  <button class="au-hamburger" (click)="toggleMobile()">
+    <i class="fa-solid fa-bars-staggered"></i>
+  </button>
+
+  <!-- Left: New button -->
+  <div class="au-header-left">
+    <button type="button" class="au-new-btn" routerLink="/classify">
+      <i class="fa fa-plus"></i><span>New</span>
+    </button>
+  </div>
+
+  <!-- Center: Search bar -->
+  <div class="au-header-center">
+    <div class="au-search">
+      <i class="fa fa-magnifying-glass au-search__icon"></i>
+      <input type="text" class="au-search__input"
+             placeholder="Search documents, profiles...">
+      <button type="button" class="au-search__filter" title="Advanced search">
+        <i class="fa fa-sliders"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Right toolbar -->
+  <div class="au-toolbar">
+    <button class="au-icon-btn" title="Notifications">
+      <i class="fa-regular fa-bell fa-lg"></i>
+      <span class="au-icon-btn__badge">3</span>
+    </button>
+  </div>
+
+  <!-- User block -->
+  <div class="au-user" (click)="showProfile = !showProfile; $event.stopPropagation()">
+    <span class="au-user__avatar">{{ initials }}</span>
+    <span class="au-user__text">
+      <span class="au-user__name">{{ username }}</span>
+      <span class="au-user__role">User</span>
+    </span>
+    <i class="fa fa-chevron-down au-user__caret"></i>
+  </div>
+</header>
+
+<!-- Profile dropdown -->
+<div class="au-profile" *ngIf="showProfile" (click)="$event.stopPropagation()">
+  <div class="au-profile__section">
+    <div class="au-profile__head">
+      <span class="au-profile__avatar">{{ initials }}</span>
+      <span class="au-profile__identity">
+        <span class="au-profile__name">{{ username }}</span>
+        <span class="au-profile__role-badge">User</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="au-profile__section">
+    <button type="button" class="au-profile__row-btn">
+      <i class="fa-solid fa-language profile-icon"></i>
+      <span class="au-profile__row-label">Language</span>
+      <span class="au-profile__row-meta">English</span>
+      <i class="fa-solid fa-chevron-right" style="font-size:11px;color:var(--au-ink-dim)"></i>
+    </button>
+  </div>
+
+  <div class="au-profile__section">
+    <label class="au-profile__row-btn" for="darkModeToggle" style="cursor:pointer;margin:0">
+      <i class="fa-regular fa-moon profile-icon"></i>
+      <span class="au-profile__row-label">Dark mode</span>
+      <input type="checkbox" id="darkModeToggle" class="au-switch">
+    </label>
+  </div>
+
+  <div class="au-profile__footer">
+    <button type="button" class="au-profile__btn au-profile__btn--primary">
+      <i class="fa-solid fa-pen"></i> Edit Profile
+    </button>
+    <button type="button" class="au-profile__btn au-profile__btn--ghost" (click)="logout()">
+      <i class="fa-solid fa-right-from-bracket"></i> Logout
+    </button>
+  </div>
+</div>
+
+<!-- Backdrop (mobile sidebar) -->
+<div class="au-backdrop" *ngIf="mobileOpen" (click)="closeMobile()"></div>
+
+<!-- Main Content -->
+<main class="au-main" [class.is-collapsed]="sidebarCollapsed" (click)="showProfile = false">
+  <div class="container-fluid py-4 px-4">
+    <router-outlet></router-outlet>
+  </div>
+</main>
+
+<!-- Footer -->
+<footer class="au-footer" [class.is-collapsed]="sidebarCollapsed">
+  <span>&copy; 2026 Auradot Pvt Ltd. &middot; Auradocs v4</span>
+  <div class="au-footer__links">
+    <a href="javascript:void(0)">Privacy</a>
+    <a href="javascript:void(0)">Terms</a>
+    <a href="javascript:void(0)">Support</a>
+  </div>
+</footer>
